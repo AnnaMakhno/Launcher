@@ -1,7 +1,8 @@
-import useDeepLink from "./model/useDeepLink";
 import AppSection from "../../components/AppSection/AppSection";
 import { loadAutorun, saveAutorun } from "../../utils/launcherStorage";
+import { loadApplicationsState } from "../../utils/applicationsStorage";
 import { useEffect, useState } from "react";
+import { openFile } from "./model/openFile";
 
 import "./Launcher.css";
 
@@ -13,42 +14,33 @@ export function Launcher({
     selectedSettings,
 }) {
     const [autorun, setAutorun] = useState(loadAutorun());
-    const [isReady, setIsReady] = useState(false);
 
-    useEffect(() => {
-        setIsReady(Boolean(selectedExecutable && selectedSettings));
-    }, [selectedExecutable, selectedSettings]);
+    const runApplication = (pathExecutable, env, urlExecutable) => {
+        if (!pathExecutable || !env) return;
+
+        const { ipcRenderer } = window.require("electron");
+
+        ipcRenderer.send("run-app", {
+            executablePath: pathExecutable,
+            env: env,
+            url: urlExecutable,
+        });
+    };
 
     useEffect(() => {
         saveAutorun(autorun);
     }, [autorun]);
-
-    const runApplication = (executable, settings, url) => {
-        if (!executable || !settings) return;
-
-        const { ipcRenderer } = window.require("electron");
-
-        console.log("RUN NOW:", {
-            exe: executable.fullPath,
-            settings,
-            url,
-        });
-
-        ipcRenderer.send("run-app", {
-            executablePath: executable.fullPath,
-            env: settings,
-            url,
-        });
-    };
-
     // AUTORUN
     useEffect(() => {
-        if (!autorun) return;
-        if (!url) return;
-        if (!selectedExecutable || !selectedSettings) return;
+        const settingState = openFile();
+        const applicationState = loadApplicationsState();
+        const autorunState = loadAutorun();
+        if (!autorunState) return;
 
-        runApplication(selectedExecutable, selectedSettings, url);
-    }, [url, autorun, selectedExecutable, selectedSettings]);
+        settingState.then((res) => {
+            runApplication(applicationState.selectedExecutablePath, res, url);
+        });
+    }, [url]);
 
     if (!loaded) return <div>Loading...</div>;
 
@@ -72,7 +64,7 @@ export function Launcher({
                     disabled={!selectedExecutable || !selectedSettings}
                     onClick={() =>
                         runApplication(
-                            selectedExecutable,
+                            selectedExecutable.fullPath,
                             selectedSettings,
                             url
                         )

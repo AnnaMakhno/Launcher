@@ -1,4 +1,4 @@
-import useSettings from "./model/useSettings";
+// import useSettings from "./model/useSettings";
 import DirectoryBar from "../../components/DirectoryBar/DirectoryBar";
 import FileList from "../../components/FileList/FileList";
 import FileViewer from "../../components/FileViewer/FileViewer";
@@ -7,17 +7,16 @@ import "./Settings.css";
 import AppSection from "../../components/AppSection/AppSection";
 import TopBar from "../../components/TopBar/TopBar";
 
-function Settings() {
-    const {
-        updateFolderPath,
-        files,
-        folderPath,
-
-        selectedFile,
-        content,
-        loadDirectory,
-        openFile,
-    } = useSettings();
+function Settings({
+    updateFolderPath,
+    files,
+    folderPath,
+    selectedFile,
+    content,
+    loadDirectory,
+    openFile,
+}) {
+    // const  = useSettings();
     return (
         <AppSection title="Settings">
             <TopBar

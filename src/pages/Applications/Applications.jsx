@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import useApplications from "./model/useApplications";
+// import useApplications from "./model/useApplications";
 import DirectoryBar from "../../components/DirectoryBar/DirectoryBar";
 import "./Applications.css";
 import AppSection from "../../components/AppSection/AppSection";
@@ -8,17 +8,26 @@ import ExecutablesFilter from "../../components/ExecutablesFilter/ExecutablesFil
 import ExecutablesList from "../../components/ExecutablesList/ExecutablesList";
 import TopBar from "../../components/TopBar/TopBar";
 
-function Applications() {
-    const {
-        folderPath,
-        executables,
-        loadDirectory,
-        updateFolderPath,
-        filter,
-        setFilter,
-        selectExecutable,
-        selectedExecutable,
-    } = useApplications();
+function Applications({
+    folderPath,
+    executables,
+    loadDirectory,
+    updateFolderPath,
+    filter,
+    setFilter,
+    selectExecutable,
+    selectedExecutable,
+}) {
+    // const {
+    //     folderPath,
+    //     executables,
+    //     loadDirectory,
+    //     updateFolderPath,
+    //     filter,
+    //     setFilter,
+    //     selectExecutable,
+    //     selectedExecutable,
+    // } = useApplications();
 
     const filteredExecutables = useMemo(() => {
         return executables.filter(
