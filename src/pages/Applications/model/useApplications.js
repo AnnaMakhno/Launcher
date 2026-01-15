@@ -5,6 +5,7 @@ import {
     loadApplicationsState,
 } from "../../../utils/applicationsStorage";
 
+// comment
 const useApplications = () => {
     const [folderPath, setFolderPath] = useState("");
     const [executables, setExecutables] = useState([]);
