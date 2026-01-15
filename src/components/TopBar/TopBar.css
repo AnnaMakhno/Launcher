@@ -1,0 +1,13 @@
+.topBar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.topBarLeft {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}

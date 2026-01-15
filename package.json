@@ -1,0 +1,41 @@
+{
+    "name": "new-app",
+    "private": true,
+    "version": "0.0.1",
+    "main": "electron-main.cjs",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "electron": "electron .",
+        "build": "vite build",
+        "preview": "vite preview",
+        "build:exe": "electron-builder"
+    },
+    "dependencies": {
+        "express": "^4.22.1",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-react": "^5.1.1",
+        "electron": "^26.6.10",
+        "electron-builder": "^26.0.12",
+        "vite": "^7.2.4"
+    },
+    "build": {
+        "appId": "com.myapp.visionaws",
+        "productName": "VisionAWS Launcher",
+        "directories": {
+            "output": "dist_build"
+        },
+        "files": [
+            "electron-main.cjs",
+            "package.json",
+            "node_modules/**/*",
+            "dist/**/*"
+        ],
+        "win": {
+            "target": "nsis"
+        }
+    }
+}

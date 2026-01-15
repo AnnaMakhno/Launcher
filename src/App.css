@@ -1,0 +1,19 @@
+.appLayout {
+    display: flex;
+    height: 100vh; /* всё приложение — строго высота окна */
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.leftColumn {
+    flex: 1.5;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.rightColumn {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}

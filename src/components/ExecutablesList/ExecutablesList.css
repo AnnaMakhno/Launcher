@@ -1,0 +1,43 @@
+.exeList li {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #ffffff; /* 👈 ВАЖНО */
+    border: 1px solid #e5e7eb;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease, border 0.2s ease;
+}
+
+.exeList li.active {
+    background: #eef2ff; /* светло-фиолетовый */
+    border-color: #6366f1;
+    position: relative;
+}
+
+.exeList li.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 4px;
+    border-radius: 2px;
+    background: #6366f1;
+}
+
+.exeList li:not(.active):hover {
+    background: #f9fafb;
+}
+
+.exeList li.active .path {
+    font-weight: 500;
+}
+
+.path.full {
+    font-size: 13px;
+}
+
+.path.relative {
+    font-size: 12px;
+    opacity: 0.7;
+}

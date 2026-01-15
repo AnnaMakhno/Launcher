@@ -1,0 +1,28 @@
+.pathBlock {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.path {
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    min-width: 320px;
+    color: #555;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.refresh {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #6c5ce7;
+    color: white;
+    border: none;
+    cursor: pointer;
+}

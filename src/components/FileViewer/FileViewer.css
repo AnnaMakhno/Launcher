@@ -1,0 +1,33 @@
+.table {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr auto 2fr;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.key {
+    /* min-width: 430px; */
+    background: #f1f2f4;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #777;
+    text-transform: uppercase;
+}
+
+.value {
+    /* min-width: 430px; */
+    min-height: 15px;
+    background: #f9f9fb;
+    border: 1px solid #e1e1e1;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 13px;
+}

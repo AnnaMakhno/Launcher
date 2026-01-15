@@ -1,0 +1,48 @@
+.container {
+    background: #f5f6f8;
+    font-family: Arial, sans-serif;
+    padding: 24px;
+}
+
+.title {
+    text-align: center;
+    font-size: 22px;
+    margin-bottom: 24px;
+}
+
+.topRow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.pathBlock {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.path {
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #555;
+    min-width: 300px;
+}
+
+.refresh {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: #6c5ce7;
+    color: white;
+    cursor: pointer;
+}
