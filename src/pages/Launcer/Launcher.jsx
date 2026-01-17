@@ -16,7 +16,7 @@ export function Launcher({
     const [autorun, setAutorun] = useState(loadAutorun());
 
     const runApplication = (pathExecutable, env, urlExecutable) => {
-        if (!pathExecutable || !env) return;
+        if (!pathExecutable || !env || !urlExecutable) return;
 
         const { ipcRenderer } = window.require("electron");
 
@@ -35,7 +35,7 @@ export function Launcher({
         const settingState = openFile();
         const applicationState = loadApplicationsState();
         const autorunState = loadAutorun();
-        if (!autorunState) return;
+        if (!autorunState || !settingState || !applicationState || !url) return;
 
         settingState.then((res) => {
             runApplication(applicationState.selectedExecutablePath, res, url);
@@ -61,7 +61,7 @@ export function Launcher({
                 </button>
 
                 <button
-                    disabled={!selectedExecutable || !selectedSettings}
+                    disabled={!selectedExecutable || !selectedSettings || !url}
                     onClick={() =>
                         runApplication(
                             selectedExecutable.fullPath,
