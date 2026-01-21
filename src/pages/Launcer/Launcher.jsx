@@ -66,7 +66,7 @@ export function Launcher({
                         runApplication(
                             selectedExecutable.fullPath,
                             selectedSettings,
-                            url
+                            url,
                         )
                     }
                 >

@@ -11,7 +11,7 @@ let pendingLink = null;
 function getDeepLink(argv) {
     return (
         argv.find(
-            (arg) => typeof arg === "string" && arg.startsWith("visionaws://")
+            (arg) => typeof arg === "string" && arg.startsWith("visionaws://"),
         ) || null
     );
 }
@@ -111,8 +111,8 @@ ipcMain.handle("read-file", async (_, filePath) => {
 
 ////////
 
-ipcMain.on("run-app", (event, { executablePath, env, args }) => {
-    console.log("Run request:", { executablePath, env, args });
+ipcMain.on("run-app", (event, { executablePath, env, url }) => {
+    console.log("Run request:", { executablePath, env, url });
 
     // преобразуем env
     const envObj = Array.isArray(env)
@@ -122,8 +122,10 @@ ipcMain.on("run-app", (event, { executablePath, env, args }) => {
           }, {})
         : {};
 
+    const args = typeof url === "string" ? [url] : [];
+
     // запускаем приложение
-    const child = spawn(executablePath, args || [], {
+    const child = spawn(executablePath, args, {
         env: {
             ...process.env,
             ...envObj,
