@@ -44,27 +44,54 @@ export const readFile = (file) => {
     });
 };
 
-export const findVisionExecutables = async (dirPath) => {
-    const walk = (currentPath, rootPath) => {
-        let items = [];
-        fs.readdirSync(currentPath).forEach((name) => {
-            const fullPath = path.join(currentPath, name);
-            const stat = fs.statSync(fullPath);
-            if (stat.isDirectory()) {
-                items.push(...walk(fullPath, rootPath));
-            } else if (
-                name.toLowerCase() === "vision.exe" ||
-                name.toLowerCase() === "visiondfa.exe"
-            ) {
-                items.push({
-                    name,
-                    fullPath, // полный путь для Electron
-                    relativePath: path.relative(rootPath, fullPath), // путь относительно выбранной папки
-                });
-            }
-        });
-        return items;
-    };
+const scanVisionExecutables = (dirPath, rootPath) => {
+    let items = [];
+    if (!fs.existsSync(dirPath)) return items;
 
-    return walk(dirPath, dirPath);
+    fs.readdirSync(dirPath).forEach((name) => {
+        const fullPath = path.join(dirPath, name);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+            items.push(...scanVisionExecutables(fullPath, rootPath));
+        } else if (
+            name.toLowerCase() === "vision.exe" ||
+            name.toLowerCase() === "visiondfa.exe"
+        ) {
+            items.push({
+                name,
+                fullPath,
+                relativePath: rootPath
+                    ? path.relative(rootPath, fullPath)
+                    : fullPath,
+            });
+        }
+    });
+
+    return items;
+};
+
+export const findVisionExecutables = async (dirPath) => {
+    const results = [];
+
+    results.push(...scanVisionExecutables(dirPath, dirPath));
+
+    const appData = process.env.APPDATA;
+
+    if (appData) {
+        const defaultPath = [
+            path.join(appData, "SoftSmile Vision"),
+            path.join(appData, "SoftSmile VisionDFA"),
+        ];
+
+        defaultPath.forEach((p) => {
+            results.push(...scanVisionExecutables(p, null));
+        });
+    }
+
+    const uniquieResults = new Map();
+    results.forEach((item) => {
+        uniquieResults.set(item.fullPath, item);
+    });
+
+    return Array.from(uniquieResults.values());
 };

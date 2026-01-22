@@ -25,6 +25,8 @@ export function Launcher({
             env: env,
             url: urlExecutable,
         });
+
+        clearUrl();
     };
 
     useEffect(() => {
