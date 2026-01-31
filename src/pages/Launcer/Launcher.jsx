@@ -14,6 +14,10 @@ export function Launcher({
     selectedSettings,
 }) {
     const [autorun, setAutorun] = useState(loadAutorun());
+    const [inputValue, setInputValue] = useState(url || "");
+    useEffect(() => {
+        setInputValue(url || "");
+    }, [url]);
 
     const runApplication = (pathExecutable, env, urlExecutable) => {
         if (!pathExecutable || !env || !urlExecutable) return;
@@ -50,25 +54,27 @@ export function Launcher({
         <AppSection title="Current link">
             <input
                 className="linkInput"
-                value={url || ""}
+                value={inputValue}
                 readOnly
             />
 
             <div className="launcherActions">
                 <button
-                    disabled={!url}
+                    disabled={!inputValue}
                     onClick={clearUrl}
                 >
                     Reset
                 </button>
 
                 <button
-                    disabled={!selectedExecutable || !selectedSettings || !url}
+                    disabled={
+                        !selectedExecutable || !selectedSettings || !inputValue
+                    }
                     onClick={() =>
                         runApplication(
                             selectedExecutable.fullPath,
                             selectedSettings,
-                            url,
+                            inputValue,
                         )
                     }
                 >

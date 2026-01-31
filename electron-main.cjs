@@ -205,7 +205,11 @@ if (!gotLock) {
     // Второй запуск через ссылку
     app.on("second-instance", (event, argv) => {
         const link = getDeepLink(argv.slice(1)); // slice(1) для Windows
-        if (link) pendingLink = link;
+        if (link) {
+            pendingLink = link;
+        } else {
+            pendingLink = null; // обычный запуск из папки → очищаем
+        }
         if (mainWindow) {
             mainWindow.webContents.send("deep-link", pendingLink);
             mainWindow.focus();
@@ -216,19 +220,17 @@ if (!gotLock) {
 
     // Первый запуск
     app.whenReady().then(async () => {
-        // Регистрация протокола
-        if (process.defaultApp) {
-            app.setAsDefaultProtocolClient("visionaws", process.execPath, [
-                path.resolve(process.argv[1]),
-            ]);
-        } else {
-            app.setAsDefaultProtocolClient("visionaws");
-        }
-
         // Windows: проверяем argv на ссылку
         if (process.platform === "win32") {
             const link = getDeepLink(process.argv.slice(1));
-            if (link) pendingLink = link;
+            if (link) {
+                pendingLink = link; // deep link
+            } else {
+                pendingLink = null; // обычный запуск → очищаем
+            }
+        } else {
+            // На macOS/другие платформы тоже безопасно
+            pendingLink = null;
         }
 
         tcpServer.start();

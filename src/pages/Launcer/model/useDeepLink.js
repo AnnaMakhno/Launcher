@@ -11,7 +11,7 @@ export default function useDeepLink() {
         }
         const { ipcRenderer } = window.require("electron");
         const handler = (_, value) => {
-            setUrl(value);
+            setUrl(value || "");
             setLoaded(true);
         };
 
