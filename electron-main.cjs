@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const express = require("express");
 const net = require("net");
-
+const fs = require("fs");
 const { spawn } = require("child_process");
 
 class CommandLineParameterActor {
@@ -169,21 +169,20 @@ function startServer() {
 }
 
 async function createWindow() {
-    if (mainWindow) {
-        if (pendingLink) {
-            mainWindow.webContents.send("deep-link", pendingLink);
-        }
-        mainWindow.focus();
-        return;
-    }
+    if (mainWindow) return;
 
     mainWindow = new BrowserWindow({
-        width: "100%",
-        height: "100%",
-        webPreferences: { nodeIntegration: true, contextIsolation: false },
+        width: 1000,
+        height: 700,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
     });
 
     const url = app.isPackaged ? await startServer() : "http://localhost:5173";
+
+    // Загрузка страницы только после того, как pendingLink готов
     mainWindow.loadURL(url);
 
     mainWindow.webContents.once("did-finish-load", () => {
@@ -203,15 +202,37 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
     app.quit();
 } else {
+    // Второй запуск через ссылку
     app.on("second-instance", (event, argv) => {
-        const link = getDeepLink(argv);
+        const link = getDeepLink(argv.slice(1)); // slice(1) для Windows
         if (link) pendingLink = link;
-        createWindow();
+        if (mainWindow) {
+            mainWindow.webContents.send("deep-link", pendingLink);
+            mainWindow.focus();
+        } else {
+            createWindow();
+        }
     });
 
-    app.whenReady().then(() => {
-        tcpServer.start(); // 👈 ТОЛЬКО здесь
-        createWindow();
+    // Первый запуск
+    app.whenReady().then(async () => {
+        // Регистрация протокола
+        if (process.defaultApp) {
+            app.setAsDefaultProtocolClient("visionaws", process.execPath, [
+                path.resolve(process.argv[1]),
+            ]);
+        } else {
+            app.setAsDefaultProtocolClient("visionaws");
+        }
+
+        // Windows: проверяем argv на ссылку
+        if (process.platform === "win32") {
+            const link = getDeepLink(process.argv.slice(1));
+            if (link) pendingLink = link;
+        }
+
+        tcpServer.start();
+        await createWindow();
     });
 }
 
