@@ -1,0 +1,183 @@
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Reactive.Linq;
+using System.Text;
+using System.Threading;
+using Microsoft.Extensions.Logging;
+using SoftSmile.Vision.DesktopManager.Logic.CommandLine;
+using SoftSmile.Vision.DesktopManager.Logic.Settings;
+
+namespace SoftSmile.Vision.DesktopManager;
+
+public class CredentialsServerForUnityEditorClients : IDisposable
+{
+    private const int UnityEditorTcpPort = 52234;
+    public static readonly IPEndPoint EndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), UnityEditorTcpPort);
+
+    private readonly CommandLineParameterActor _commandLineParameterActor;
+    private readonly ILogger<CredentialsServerForUnityEditorClients> _logger;
+    private readonly IDisposable _subscription;
+
+    private SettingsFile? _currentSettingsFile;
+    private CancellationTokenSource? _tokenSource = null;
+    private TcpListener? _tcpListener = null;
+    private Task? _runningTask = null;
+
+    public CredentialsServerForUnityEditorClients(CommandLineParameterActor commandLineParameterActor,
+        ICurrentSettingsFileActor currentSettingsFileActor,
+        ILogger<CredentialsServerForUnityEditorClients> logger)
+    {
+        _commandLineParameterActor = commandLineParameterActor;
+        _logger = logger;
+        _subscription = currentSettingsFileActor.CurrentFileChanged.Subscribe(UpdateLocalFile);
+    }
+
+    public void Start()
+    {
+        _tokenSource = new CancellationTokenSource();
+        _tcpListener = new TcpListener(EndPoint);
+        _runningTask = SendCommandLineEndlesslyAsyncInternal(_tcpListener, _tokenSource.Token);
+    }
+
+    public async Task StopAsync()
+    {
+        _tokenSource?.Cancel();
+        if (_runningTask is not null)
+            await _runningTask.ConfigureAwait(false);
+    }
+
+    public void Dispose()
+    {
+        StopAsync().GetAwaiter().GetResult();
+        _subscription.Dispose();
+        _tcpListener?.Stop();
+    }
+
+    private void UpdateLocalFile(SettingsFile? currentSettingsFile)
+    {
+        _currentSettingsFile = currentSettingsFile;
+    }
+
+    private async Task SendCommandLineEndlesslyAsyncInternal(TcpListener tcpListener, CancellationToken cancellationToken)
+    {
+        try
+        {
+            tcpListener.Start();
+            await WaitForConnectionsAndAnswerAsync(tcpListener, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            tcpListener.Stop();
+        }
+    }
+
+    private async Task WaitForConnectionsAndAnswerAsync(TcpListener tcpListener, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                TcpClient tcpClient = await tcpListener
+                    .AcceptTcpClientAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                var stream = tcpClient.GetStream();
+                stream.ReadTimeout = 5000;
+
+                int readByte = TryReadByte(stream, 5);
+                if (readByte == -1 || readByte == 0)
+                {
+                    _ = MonitorParamsAndSendAsync(tcpClient, cancellationToken);
+                }
+                else if (readByte == 1)
+                {
+                    await SendCurrentSettingsAsync(tcpClient, cancellationToken);
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Error sending data to client");
+            }
+        }
+    }
+    private async Task MonitorParamsAndSendAsync(TcpClient tcpClient, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // If we don't receive anything, we send the parameters
+            string stringParam =
+                await PullParametersWhenNotEmptyAsync(cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            byte[] bytesToSend = Encoding.UTF8.GetBytes(stringParam);
+            await tcpClient.GetStream().WriteAsync(bytesToSend, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            tcpClient.Dispose();
+        }
+    }
+
+    private async Task SendCurrentSettingsAsync(TcpClient tcpClient, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // The settings are requested
+            if (_currentSettingsFile is null)
+                // Reset the connection
+                return;
+            IEnumerable<string> keyValues = _currentSettingsFile.Value.variables
+                .Select(kv => $"{kv.Key}={kv.Value}");
+            var stringToSend = string.Join('|', keyValues);
+            byte[] bytesToSend = Encoding.UTF8.GetBytes(stringToSend);
+            await tcpClient.GetStream().WriteAsync(bytesToSend, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            tcpClient.Dispose();
+        }
+    }
+
+    private int TryReadByte(NetworkStream networkStream, int timeoutInMilliseconds)
+    {
+        var readTimeoutBefore = networkStream.ReadTimeout;
+        networkStream.ReadTimeout = timeoutInMilliseconds;
+        try
+        {
+            return networkStream.ReadByte();
+        }
+        catch (IOException)
+        {
+            return -1;
+        }
+        finally
+        {
+            networkStream.ReadTimeout = readTimeoutBefore;
+        }
+    }
+
+    /// <summary>
+    /// What an ugly implementation.. Rewrite later to use 
+    /// </summary>
+    private async Task<string> PullParametersWhenNotEmptyAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            // Monitor
+            string? stringParam = _commandLineParameterActor.GetParam();
+            if (string.IsNullOrEmpty(stringParam))
+            {
+                await Task.Delay(50).ConfigureAwait(false);
+                continue;
+            }
+            // When the parameters are fine and we pass them,
+            // they are reset to avoid confusing another clients
+            // with already used auth data
+            _commandLineParameterActor.ResetParams();
+            return stringParam!;
+        }
+        throw new OperationCanceledException();
+    }
+}

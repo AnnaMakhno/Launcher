@@ -1,8 +1,145 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const express = require("express");
+const net = require("net");
 
 const { spawn } = require("child_process");
+
+class CommandLineParameterActor {
+    constructor() {
+        this.param = "";
+    }
+
+    getParam() {
+        return this.param;
+    }
+
+    setParam(value) {
+        this.param = value;
+    }
+
+    resetParams() {
+        this.param = "";
+    }
+}
+class SettingsHolder {
+    constructor() {
+        this.currentSettingsFile = null;
+    }
+
+    update(settingsFile) {
+        this.currentSettingsFile = settingsFile;
+    }
+}
+
+const UNITY_EDITOR_TCP_PORT = 52234;
+const HOST = "127.0.0.1";
+
+class CredentialsServerForUnityEditorClients {
+    constructor(commandLineActor, settingsHolder) {
+        this.commandLineActor = commandLineActor;
+        this.settingsHolder = settingsHolder;
+        this.server = null;
+    }
+
+    start() {
+        if (this.server) return;
+
+        this.server = net.createServer((socket) =>
+            this.handleClient(socket).catch((err) =>
+                console.error("TCP client error:", err),
+            ),
+        );
+
+        this.server.listen(UNITY_EDITOR_TCP_PORT, HOST, () => {
+            console.log(
+                `TCP server started on ${HOST}:${UNITY_EDITOR_TCP_PORT}`,
+            );
+        });
+    }
+
+    stop() {
+        if (!this.server) return;
+        this.server.close();
+        this.server = null;
+    }
+
+    async handleClient(socket) {
+        socket.setTimeout(5000);
+
+        const firstByte = await this.tryReadByte(socket, 5);
+
+        if (firstByte === -1 || firstByte === 0) {
+            await this.monitorParamsAndSend(socket);
+        } else if (firstByte === 1) {
+            await this.sendCurrentSettings(socket);
+        }
+
+        socket.end();
+    }
+
+    tryReadByte(socket, timeoutMs) {
+        return new Promise((resolve) => {
+            let done = false;
+
+            const timer = setTimeout(() => {
+                if (!done) {
+                    done = true;
+                    resolve(-1);
+                }
+            }, timeoutMs);
+
+            socket.once("data", (data) => {
+                if (done) return;
+                clearTimeout(timer);
+                done = true;
+                resolve(data[0]);
+            });
+
+            socket.once("error", () => {
+                if (!done) {
+                    clearTimeout(timer);
+                    done = true;
+                    resolve(-1);
+                }
+            });
+        });
+    }
+
+    async monitorParamsAndSend(socket) {
+        const param = await this.pullParametersWhenNotEmpty();
+        socket.write(Buffer.from(param, "utf8"));
+    }
+
+    async sendCurrentSettings(socket) {
+        const settings = this.settingsHolder.currentSettingsFile;
+        if (!settings) return;
+
+        const payload = Object.entries(settings.variables)
+            .map(([k, v]) => `${k}=${v}`)
+            .join("|");
+
+        socket.write(Buffer.from(payload, "utf8"));
+    }
+
+    async pullParametersWhenNotEmpty() {
+        while (true) {
+            const p = this.commandLineActor.getParam();
+            if (p) {
+                this.commandLineActor.resetParams();
+                return p;
+            }
+            await new Promise((r) => setTimeout(r, 50));
+        }
+    }
+}
+
+const commandLineActor = new CommandLineParameterActor();
+const settingsHolder = new SettingsHolder();
+const tcpServer = new CredentialsServerForUnityEditorClients(
+    commandLineActor,
+    settingsHolder,
+);
 
 let mainWindow = null;
 let server = null;
@@ -62,29 +199,21 @@ async function createWindow() {
 }
 
 const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) app.quit();
-else {
+
+if (!gotLock) {
+    app.quit();
+} else {
     app.on("second-instance", (event, argv) => {
         const link = getDeepLink(argv);
         if (link) pendingLink = link;
         createWindow();
     });
+
+    app.whenReady().then(() => {
+        tcpServer.start(); // 👈 ТОЛЬКО здесь
+        createWindow();
+    });
 }
-
-app.whenReady().then(() => {
-    const link = getDeepLink(process.argv);
-    if (link) pendingLink = link;
-
-    if (process.defaultApp) {
-        app.setAsDefaultProtocolClient("visionaws", process.execPath, [
-            path.resolve(process.argv[1]),
-        ]);
-    } else {
-        app.setAsDefaultProtocolClient("visionaws");
-    }
-
-    createWindow();
-});
 
 ipcMain.on("request-link", (event) => {
     event.sender.send("deep-link", pendingLink);
@@ -92,6 +221,10 @@ ipcMain.on("request-link", (event) => {
 
 app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", () => {
+    tcpServer.stop();
 });
 
 // // NEW
@@ -114,6 +247,15 @@ ipcMain.handle("read-file", async (_, filePath) => {
 ipcMain.on("run-app", (event, { executablePath, env, url }) => {
     console.log("Run request:", { executablePath, env, url });
 
+    settingsHolder.update({
+        variables: env.reduce((acc, p) => {
+            acc[p.Key] = p.Value;
+            return acc;
+        }, {}),
+    });
+    if (url) {
+        commandLineActor.setParam(url);
+    }
     // преобразуем env
     const envObj = Array.isArray(env)
         ? env.reduce((acc, pair) => {
