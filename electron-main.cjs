@@ -5,28 +5,26 @@ const net = require("net");
 const fs = require("fs");
 const { spawn } = require("child_process");
 
+// ---------- Классы ----------
 class CommandLineParameterActor {
     constructor() {
         this.param = "";
     }
-
     getParam() {
         return this.param;
     }
-
     setParam(value) {
         this.param = value;
     }
-
     resetParams() {
         this.param = "";
     }
 }
+
 class SettingsHolder {
     constructor() {
         this.currentSettingsFile = null;
     }
-
     update(settingsFile) {
         this.currentSettingsFile = settingsFile;
     }
@@ -44,13 +42,11 @@ class CredentialsServerForUnityEditorClients {
 
     start() {
         if (this.server) return;
-
         this.server = net.createServer((socket) =>
             this.handleClient(socket).catch((err) =>
                 console.error("TCP client error:", err),
             ),
         );
-
         this.server.listen(UNITY_EDITOR_TCP_PORT, HOST, () => {
             console.log(
                 `TCP server started on ${HOST}:${UNITY_EDITOR_TCP_PORT}`,
@@ -66,36 +62,29 @@ class CredentialsServerForUnityEditorClients {
 
     async handleClient(socket) {
         socket.setTimeout(5000);
-
         const firstByte = await this.tryReadByte(socket, 5);
 
-        if (firstByte === -1 || firstByte === 0) {
+        if (firstByte === -1 || firstByte === 0)
             await this.monitorParamsAndSend(socket);
-        } else if (firstByte === 1) {
-            await this.sendCurrentSettings(socket);
-        }
-
+        else if (firstByte === 1) await this.sendCurrentSettings(socket);
         socket.end();
     }
 
     tryReadByte(socket, timeoutMs) {
         return new Promise((resolve) => {
             let done = false;
-
             const timer = setTimeout(() => {
                 if (!done) {
                     done = true;
                     resolve(-1);
                 }
             }, timeoutMs);
-
             socket.once("data", (data) => {
                 if (done) return;
                 clearTimeout(timer);
                 done = true;
                 resolve(data[0]);
             });
-
             socket.once("error", () => {
                 if (!done) {
                     clearTimeout(timer);
@@ -114,11 +103,9 @@ class CredentialsServerForUnityEditorClients {
     async sendCurrentSettings(socket) {
         const settings = this.settingsHolder.currentSettingsFile;
         if (!settings) return;
-
         const payload = Object.entries(settings.variables)
             .map(([k, v]) => `${k}=${v}`)
             .join("|");
-
         socket.write(Buffer.from(payload, "utf8"));
     }
 
@@ -134,6 +121,7 @@ class CredentialsServerForUnityEditorClients {
     }
 }
 
+// ---------- Инициализация ----------
 const commandLineActor = new CommandLineParameterActor();
 const settingsHolder = new SettingsHolder();
 const tcpServer = new CredentialsServerForUnityEditorClients(
@@ -145,6 +133,7 @@ let mainWindow = null;
 let server = null;
 let pendingLink = null;
 
+// ---------- Deep-link ----------
 function getDeepLink(argv) {
     return (
         argv.find(
@@ -153,13 +142,12 @@ function getDeepLink(argv) {
     );
 }
 
+// ---------- Сервер для production ----------
 function startServer() {
     if (server) return Promise.resolve("http://localhost:3000");
-
     return new Promise((resolve) => {
         const appServer = express();
         appServer.use(express.static(path.join(__dirname, "dist")));
-
         server = appServer.listen(3000, () => resolve("http://localhost:3000"));
         server.on("error", (err) => {
             if (err.code === "EADDRINUSE") resolve("http://localhost:3000");
@@ -168,6 +156,7 @@ function startServer() {
     });
 }
 
+// ---------- Создание окна ----------
 async function createWindow() {
     if (mainWindow) return;
 
@@ -181,15 +170,7 @@ async function createWindow() {
     });
 
     const url = app.isPackaged ? await startServer() : "http://localhost:5173";
-
-    // Загрузка страницы только после того, как pendingLink готов
     mainWindow.loadURL(url);
-
-    mainWindow.webContents.once("did-finish-load", () => {
-        if (pendingLink) {
-            mainWindow.webContents.send("deep-link", pendingLink);
-        }
-    });
 
     mainWindow.on("closed", () => {
         mainWindow = null;
@@ -197,40 +178,24 @@ async function createWindow() {
     });
 }
 
+// ---------- Single instance ----------
 const gotLock = app.requestSingleInstanceLock();
-
-if (!gotLock) {
-    app.quit();
-} else {
-    // Второй запуск через ссылку
+if (!gotLock) app.quit();
+else {
     app.on("second-instance", (event, argv) => {
-        const link = getDeepLink(argv.slice(1)); // slice(1) для Windows
-        if (link) {
-            pendingLink = link;
-        } else {
-            pendingLink = null; // обычный запуск из папки → очищаем
-        }
-        if (mainWindow) {
-            mainWindow.webContents.send("deep-link", pendingLink);
-            mainWindow.focus();
-        } else {
-            createWindow();
-        }
+        const link = getDeepLink(argv.slice(1));
+        pendingLink = link || null; // ссылка есть только если пришла через протокол
+
+        if (!mainWindow) createWindow();
+        else if (link) mainWindow.webContents.send("deep-link", pendingLink); // обновляем только если есть ссылка
+        if (mainWindow) mainWindow.focus();
     });
 
-    // Первый запуск
     app.whenReady().then(async () => {
-        // Windows: проверяем argv на ссылку
+        // Windows: проверка ссылки при первом запуске
         if (process.platform === "win32") {
             const link = getDeepLink(process.argv.slice(1));
-            if (link) {
-                pendingLink = link; // deep link
-            } else {
-                pendingLink = null; // обычный запуск → очищаем
-            }
-        } else {
-            // На macOS/другие платформы тоже безопасно
-            pendingLink = null;
+            pendingLink = link || null; // ссылка есть только если первый запуск из браузера
         }
 
         tcpServer.start();
@@ -238,34 +203,10 @@ if (!gotLock) {
     });
 }
 
+// ---------- IPC ----------
 ipcMain.on("request-link", (event) => {
-    event.sender.send("deep-link", pendingLink);
+    event.sender.send("deep-link", pendingLink); // всегда отдаём текущее значение (или null)
 });
-
-app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") app.quit();
-});
-
-app.on("before-quit", () => {
-    tcpServer.stop();
-});
-
-// // NEW
-
-ipcMain.handle("read-directory", async (_, folderPath) => {
-    const files = fs.readdirSync(folderPath).map((name) => ({
-        name,
-        path: path.join(folderPath, name),
-    }));
-
-    return files;
-});
-
-ipcMain.handle("read-file", async (_, filePath) => {
-    return fs.readFileSync(filePath, "utf-8");
-});
-
-////////
 
 ipcMain.on("run-app", (event, { executablePath, env, url }) => {
     console.log("Run request:", { executablePath, env, url });
@@ -276,28 +217,37 @@ ipcMain.on("run-app", (event, { executablePath, env, url }) => {
             return acc;
         }, {}),
     });
-    if (url) {
-        commandLineActor.setParam(url);
-    }
-    // преобразуем env
+
+    if (url) commandLineActor.setParam(url);
+
     const envObj = Array.isArray(env)
         ? env.reduce((acc, pair) => {
               acc[pair.Key] = pair.Value;
               return acc;
           }, {})
         : {};
-
     const args = typeof url === "string" ? [url] : [];
 
-    // запускаем приложение
     const child = spawn(executablePath, args, {
-        env: {
-            ...process.env,
-            ...envObj,
-        },
+        env: { ...process.env, ...envObj },
     });
-
     child.stdout.on("data", (data) => console.log(`APP OUT: ${data}`));
     child.stderr.on("data", (data) => console.error(`APP ERROR: ${data}`));
     child.on("close", (code) => console.log(`App exited with code ${code}`));
 });
+
+// ---------- Файловые операции ----------
+ipcMain.handle("read-directory", async (_, folderPath) =>
+    fs
+        .readdirSync(folderPath)
+        .map((name) => ({ name, path: path.join(folderPath, name) })),
+);
+ipcMain.handle("read-file", async (_, filePath) =>
+    fs.readFileSync(filePath, "utf-8"),
+);
+
+// ---------- Закрытие ----------
+app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
+});
+app.on("before-quit", () => tcpServer.stop());
