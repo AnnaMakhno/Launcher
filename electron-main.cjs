@@ -251,3 +251,42 @@ app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
 });
 app.on("before-quit", () => tcpServer.stop());
+
+ipcMain.handle("find-vision-executables", async (_, userDir) => {
+    const home = app.getPath("home");
+
+    const defaultPaths = [
+        path.join(home, "AppData", "Roaming", "SoftSmile Vision"),
+        path.join(home, "AppData", "Roaming", "SoftSmile VisionDFA"),
+
+        path.join(home, "AppData", "Local", "SoftSmile Vision"),
+        path.join(home, "AppData", "Local", "SoftSmile VisionDFA"),
+    ];
+
+    console.log("HOME:", home);
+    console.log("Scanning:", defaultPaths);
+
+    const scan = (dir) => {
+        let result = [];
+        if (!fs.existsSync(dir)) return result;
+
+        for (const name of fs.readdirSync(dir)) {
+            const fullPath = path.join(dir, name);
+            const stat = fs.statSync(fullPath);
+
+            if (stat.isDirectory()) {
+                result.push(...scan(fullPath));
+            } else if (
+                name.toLowerCase() === "vision.exe" ||
+                name.toLowerCase() === "visiondfa.exe"
+            ) {
+                result.push({ name, fullPath });
+            }
+        }
+        return result;
+    };
+
+    const results = [...scan(userDir), ...defaultPaths.flatMap(scan)];
+
+    return Array.from(new Map(results.map((r) => [r.fullPath, r])).values());
+});

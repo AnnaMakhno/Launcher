@@ -71,27 +71,7 @@ const scanVisionExecutables = (dirPath, rootPath) => {
 };
 
 export const findVisionExecutables = async (dirPath) => {
-    const results = [];
-
-    results.push(...scanVisionExecutables(dirPath, dirPath));
-
-    const appData = process.env.APPDATA;
-
-    if (appData) {
-        const defaultPath = [
-            path.join(appData, "SoftSmile Vision"),
-            path.join(appData, "SoftSmile VisionDFA"),
-        ];
-
-        defaultPath.forEach((p) => {
-            results.push(...scanVisionExecutables(p, null));
-        });
-    }
-
-    const uniquieResults = new Map();
-    results.forEach((item) => {
-        uniquieResults.set(item.fullPath, item);
-    });
-
-    return Array.from(uniquieResults.values());
+    return await window
+        .require("electron")
+        .ipcRenderer.invoke("find-vision-executables", dirPath);
 };
