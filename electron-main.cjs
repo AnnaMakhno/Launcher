@@ -132,12 +132,39 @@ const tcpServer = new CredentialsServerForUnityEditorClients(
 let mainWindow = null;
 let server = null;
 let pendingLink = null;
+const DEEP_LINK_PROTOCOLS = ["vision2", "visionaws", "visionawsdfa", "vision"];
+
+for (const protocol of DEEP_LINK_PROTOCOLS) {
+    if (process.defaultApp) {
+        if (process.argv.length >= 2) {
+            app.setAsDefaultProtocolClient(protocol, process.execPath, [
+                path.resolve(process.argv[1]),
+            ]);
+        }
+    } else {
+        app.setAsDefaultProtocolClient(protocol);
+    }
+}
+
+// if (process.defaultApp) {
+//     if (process.argv.length >= 2) {
+//         app.setAsDefaultProtocolClient("visionaws", process.execPath, [
+//             path.resolve(process.argv[1]),
+//         ]);
+//     }
+// } else {
+//     app.setAsDefaultProtocolClient("visionaws");
+// }
 
 // ---------- Deep-link ----------
 function getDeepLink(argv) {
     return (
         argv.find(
-            (arg) => typeof arg === "string" && arg.startsWith("visionaws://"),
+            (arg) =>
+                typeof arg === "string" &&
+                DEEP_LINK_PROTOCOLS.some((protocol) =>
+                    arg.startsWith(protocol),
+                ),
         ) || null
     );
 }
@@ -253,17 +280,17 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => tcpServer.stop());
 
 ipcMain.handle("find-vision-executables", async (_, userDir) => {
-    const home = app.getPath("home");
+    const appData = app.getPath("appData");
+    const localAppData = app.getPath("userData").replace("Roaming", "Local");
 
     const defaultPaths = [
-        path.join(home, "AppData", "Roaming", "SoftSmile Vision"),
-        path.join(home, "AppData", "Roaming", "SoftSmile VisionDFA"),
+        path.join(appData, "SoftSmile Vision"),
+        path.join(appData, "SoftSmile VisionDFA"),
 
-        path.join(home, "AppData", "Local", "SoftSmile Vision"),
-        path.join(home, "AppData", "Local", "SoftSmile VisionDFA"),
+        path.join(localAppData, "SoftSmile Vision"),
+        path.join(localAppData, "SoftSmile VisionDFA"),
     ];
 
-    console.log("HOME:", home);
     console.log("Scanning:", defaultPaths);
 
     const scan = (dir) => {

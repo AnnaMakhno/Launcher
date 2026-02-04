@@ -25,6 +25,17 @@
     "build": {
         "appId": "com.myapp.visionaws",
         "productName": "VisionAWS Launcher",
+        "protocols": [
+            {
+                "name": "VisionAWS",
+                "schemes": [
+                    "visionaws",
+                    "visionawsdfa",
+                    "vision",
+                    "vision2"
+                ]
+            }
+        ],
         "directories": {
             "output": "dist_build"
         },
@@ -35,7 +46,13 @@
             "dist/**/*"
         ],
         "win": {
-            "target": "nsis"
+            "target": "nsis",
+            "requestedExecutionLevel": "asInvoker"
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowElevation": true
         }
     }
 }

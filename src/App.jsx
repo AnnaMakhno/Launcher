@@ -13,6 +13,7 @@ export default function App() {
     const apps = useApplications();
     const settings = useSettings();
     const deepLink = useDeepLink();
+    console.log("123");
 
     // Передаём внутрь Launcher всё, что ему нужно
     return (
